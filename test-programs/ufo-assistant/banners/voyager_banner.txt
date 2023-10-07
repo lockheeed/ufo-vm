@@ -1,0 +1,5 @@
+
+ Packet exchange from [ Voyager 1 ] to 32 bytes of data:
+ Response from [ Voyager 1 ]: number of bytes=32 time=79253982ms TTL=59
+
+ [ Voyager 1 ] > Hi, i'm voyager! Ask me something important.

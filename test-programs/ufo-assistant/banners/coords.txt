@@ -1,0 +1,5 @@
+
+ Universal coord : G42'187479290 T17'702471204 F12500 (ly)
+ Label           : Earth
+ Travel time     : 0000/00/00 00:00:00.0000
+ 

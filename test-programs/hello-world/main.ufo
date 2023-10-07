@@ -1,0 +1,28 @@
+.data
+    hello           db "Hello world!"
+
+.code
+
+######### PRINT PROC #########
+# r1 in string
+print: 
+    jmpb putc, [r1]
+
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+putc:
+    putb [r1]
+    addw r1, 1
+    jmpb print, 1
+######### PRINT PROC #########
+
+start: # ENTRY POINT
+    # call print
+    movw r0, rip
+    addw r0, 19
+    leaw r1, hello
+    jmpb print, 1
+
+    exitd

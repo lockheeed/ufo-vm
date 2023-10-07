@@ -1,0 +1,684 @@
+.data ####################################################
+    str_banner      db file(banners/banner.txt)
+    str_options     db file(banners/options.txt)
+    str_coords      db file(banners/coords.txt)
+    str_vygr_banner db file(banners/voyager_banner.txt)
+    str_name        db " name : "
+    str_code        db " code : "
+    str_prompt      db " >> "
+    str_vygr_prompt db " [ Voyager 1 ] > "
+    str_user_prompt db " [    You    ] < "
+    str_vygr_ans    db " [ Voyager 1 ] > Yeeeas. "
+                    db " [ Voyager 1 ] > Noooou. "
+                    db " [ Voyager 1 ] > Ho-ho-ho"
+                    db " [ Voyager 1 ] > Blblblbl"
+
+    inp_vygr_prompt dd
+                    db # nullterminator
+    inp_prompt      dw
+
+    str_invalid_cd  db "\n Invalid credentials! Are you sure you're an alien??? >:(\n"
+    str_welcome     db "\n Welcome back, "
+    str_excl        db "!\n"
+    
+    alphabet        db "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-"
+    alphabet_len    db 37
+
+    inp_name        dq
+                    dq
+                    dq
+                    dq
+
+    inp_code        dq
+                    dq
+                    dq
+                    dq
+                    dq
+                    dq
+                    dq
+                    dq
+                    db # nullterminator
+
+    inp_name_len    dw
+    inp_code_len    dw
+
+    code            dq
+                    dq
+                    dq
+                    dq
+
+    flag            db file(banners/flag.enc)
+    flag_len        dw 29
+
+    var_a           dq 0x9febc51706001c40 
+    var_b           dq 0x3ccb8471c3e81d1d 
+    var_c           dq 0xf6f88a504e6ab4de 
+    var_d           dq 0x2c74dbaec79443c
+
+    decrypted       db 0
+
+
+.code ####################################################
+
+######### PRINT PROC #########
+# r1 in string
+print: 
+    jmpb putc, [r1]
+
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+putc:
+    putb [r1]
+    addw r1, 1
+    jmpb print, 1
+######### PRINT PROC #########
+
+
+######### GETLINE PROC #########
+# r1 out buffer
+# r2 in out buffer_size/readen
+get_line:
+    movw r4, r2
+get_loopstart:
+    subw r2, 1
+
+buffer_len_check:
+    jmpw getc, r2
+    movb [r1], r2
+
+loop_endline:
+    getb r1
+    subb r1, 10
+    jmpb loop_endline, r1
+
+gtl_return:
+    addw r2, 1
+    subw r4, r2
+    movw r2, r4
+    movb r3, 1
+    jmpb [r0], r3
+    exitd
+
+getc:
+    getb [r1]
+
+    movb r3, [r1]
+    subb r3, 10
+    jmpb gtl_loopend, r3
+
+    movb r3, 0
+    movb [r1], r3
+    jmpb gtl_return, 1
+
+gtl_loopend:
+    addw r1, 1
+    jmpb get_loopstart, 1
+######### GETLINE PROC #########
+
+
+######### UPPER PROC #########
+# r1 in string
+upper: 
+    jmpb exec_upper, [r1]
+
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+exec_upper:
+    movb r2, [r1]
+    subb r2, 97
+    andb r2, 0x80
+    jmpb cont_upper, r2
+
+    movb r2, [r1]
+    movb r3, 122
+    subb r3, r2
+    andb r3, 0x80
+    jmpb cont_upper, r3
+
+    movb r2, [r1]
+    subb r2, 32
+    movb [r1], r2
+
+cont_upper:
+    addw r1, 1
+    jmpb upper, 1
+######### UPPER PROC #########
+
+
+######### HEXTOBYTES PROC #########
+# r1 in string
+# r6 out bytes_buffer
+# r2 out error_status
+hex2bytes: 
+    jmpb exec_h2b, [r1]
+
+    movq r2, 0
+
+ret_h2b:
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+err_ret_h2b:
+    movq r2, 1
+    jmpb ret_h2b, 1
+
+exec_h2b:
+    movb r5, 4
+    movb r4, 0
+
+byteloop:
+    movb r2, [r1]
+    subb r2, 48
+    andb r2, 0x80
+    jmpb af_check, r2
+
+    movb r2, [r1]
+    movb r3, 57
+    subb r3, r2
+    andb r3, 0x80
+    jmpb af_check, r3
+
+    #### TODO     proc decimal
+    movb r2, [r1]
+    subb r2, 48
+    jmpb push_half_byte, 1
+    ####
+
+af_check:
+    movb r2, [r1]
+    subb r2, 65
+    andb r2, 0x80
+    jmpb err_ret_h2b, r2
+
+    movb r2, [r1]
+    movb r3, 70
+    subb r3, r2
+    andb r3, 0x80
+    jmpb err_ret_h2b, r3
+
+    movb r2, [r1]
+    subb r2, 55
+
+push_half_byte:
+    # r2 - (0 - 16) | r4 - value | r5 - shift
+    rolb r2, r5
+    orb r4, r2
+
+    addw r1, 1
+    jmpb lower_iter_h2b, r5
+
+    movb [r6], r4
+    addb r6, 1
+    jmpb hex2bytes, 1
+    
+lower_iter_h2b:
+    movb r5, 0
+    jmpb byteloop, 1
+
+######### HEXTOBYTES PROC #########
+
+
+######### INDEX PROC #########
+# r1 in out char/index
+# r2 out error_status
+index: 
+    movq r2, 0 # index
+
+loopstart_ind:
+    movb r3, r2
+    subb r3, alphabet_len
+    jmpb exec_ind, r3
+    
+    movb r2, 1
+return_ind:
+    movb r3, 1
+    jmpb [r0], r3 
+    exitd
+
+exec_ind:
+    leaw r3, alphabet
+    addw r3, r2
+    movb r3, [r3]
+    movb r4, r1
+    subb r4, r3
+    jmpb loopend_ind, r4
+
+    movb r1, r2
+    movb r2, 0
+    jmpb return_ind, 1
+
+loopend_ind:
+    addb r2, 1
+    jmpb loopstart_ind, 1
+######### INDEX PROC #########
+
+
+######### INITVARS PROC #########
+# r1 in name
+# r2 out error_status
+initvars: 
+    movq r3, 0 # si
+loopstart_iv:
+    jmpb exec_iv, [r1]
+    
+    movb r2, 0
+ret_iv:
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+err_ret_iv:
+    movb r2, 1
+    jmpb ret_iv, 1
+
+exec_iv:
+    # get character index
+    movw r9, r0
+    movw r8, r1
+    movq r7, r3
+
+    movw r0, rip
+    addw r0, 19
+    movb r1, [r8]
+    jmpb index, 1
+
+    movb r6, r1
+
+    movw r0, r9
+    movw r1, r8
+    movq r3, r7
+
+    jmpb err_ret_iv, r2
+
+    addb r3, r6 
+
+    movq r4, 0
+    movb r4, r3
+    mulq r4, 0x6eb3e45306eb3e4
+
+    addq var_a, var_d
+    addq var_a, r4
+    rolq var_a, r3
+
+    addq var_b, var_a
+    addq var_b, r4
+    rolq var_b, r3
+
+    addq var_c, var_b
+    addq var_c, r4
+    rolq var_c, r3
+
+    addq var_d, var_c
+    addq var_d, r4
+    rolq var_d, r3
+
+    addw r1, 1
+    jmpb loopstart_iv, 1
+######### INITVARS PROC #########
+
+
+######### CHECK_CODE PROC #########
+# r2 out error_status
+check_code:
+    movq r1, (code)
+    mulq r1, (code+24)
+    subq r1, var_a
+    jmpq err_ret_chk, r1
+
+    movq r1, (code+8)
+    mulq r1, (code+16)
+    subq r1, var_b
+    jmpq err_ret_chk, r1
+
+    movq r1, (code)
+    xorq r1, (code+16)
+    subq r1, var_c
+    jmpq err_ret_chk, r1
+
+    movq r1, (code+8)
+    xorq r1, (code+24)
+    subq r1, var_d
+    jmpq err_ret_chk, r1
+
+    movb r1, (code+15)
+    andb r1, 0x80
+    subb r1, 0x80
+    jmpb err_ret_chk, r1
+
+    movb r1, (code+31)
+    andb r1, 0x80
+    subb r1, 0x80
+    jmpb err_ret_chk, r1
+
+    movb r2, 0
+
+ret_chk:
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+err_ret_chk:
+    movb r2, 1
+    jmpb ret_chk, 1
+######### CHECK_CODE PROC #########
+
+
+######## MENU PROC #########
+menu_proc:
+    movw r9, r0
+
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_prompt
+    jmpb print, 1
+
+    movw r0, rip
+    addw r0, 24
+    leaw r1, inp_prompt
+    movw r2, 2
+    jmpb get_line, 1
+
+    movw r0, r9
+
+    jmpb exec_prompt, r2
+
+ret_menu:
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+exec_prompt:
+    subb inp_prompt, 0x31
+    jmpb prompt_voayger, inp_prompt
+
+    # get cords
+
+    movw r9, r0
+
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_coords
+    jmpb print, 1
+
+    movw r0, r9
+
+    jmpb ret_menu, 1
+
+prompt_voayger:
+    subb inp_prompt, 1
+    jmpb prompt_flag, inp_prompt
+
+    # voyager chat
+
+    movw r9, r0
+
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_vygr_banner
+    jmpb print, 1
+
+    movw r0, r9
+
+voyager_chat_loop:
+    movw r9, r0
+
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_user_prompt
+    jmpb print, 1
+    
+    movw r0, rip
+    addw r0, 24
+    leaw r1, inp_vygr_prompt
+    movw r2, 5
+    jmpb get_line, 1
+
+    movw r0, r9
+
+    subb inp_vygr_prompt, 101
+    subb (inp_vygr_prompt+1), 120
+    subb (inp_vygr_prompt+2), 105
+    subb (inp_vygr_prompt+3), 116
+
+    jmpd voyager_answer, inp_vygr_prompt
+    
+    putb 10
+    jmpb ret_menu, 1
+
+voyager_answer:
+    movw r2, 0
+    randb r2, 4
+    mulb r2, 26
+    leaw r1, str_vygr_ans
+    addw r1, r2
+
+    movw r9, r0
+
+    movw r0, rip
+    addw r0, 14
+    jmpb print, 1
+    
+    movw r0, r9
+
+    putb 10
+
+    jmpb voyager_chat_loop, 1
+
+prompt_flag:
+    subb inp_prompt, 1
+    jmpb ret_menu, inp_prompt
+
+    # get flag
+
+    putb 10
+
+    movw r9, r0
+
+    movw r0, rip
+    addw r0, 14
+    jmpb decrypt_flag, 1
+
+    movw r0, rip
+    addw r0, 19
+    leaw r1, flag
+    jmpb print, 1
+    
+    movw r0, r9
+
+    putb 10
+    putb 10
+
+    jmpb ret_menu, 1
+
+######## MENU PROC #########
+
+
+######## DECRYPT FLAG ########
+decrypt_flag:
+    jmpb ret_decrypt, decrypted
+    movw r1, flag_len
+    mulw r1, 3
+    subw r1, 1
+
+decrypt_loop:
+    addw r1, 1
+    jmpw decrypt_iter, r1
+    
+    movb decrypted, 1
+ret_decrypt:
+    movb r1, 1
+    jmpb [r0], r1 
+    exitd
+
+decrypt_iter:
+    # r2 - cipher index
+    # r3 - key index
+
+    subw r1, 1
+
+    movw r2, r1
+    movw r3, r1
+    movw r4, r1
+    movw r5, r1
+    
+    divw r4, flag_len
+    divw r5, 32
+
+    mulw r4, flag_len
+    mulw r5, 32
+
+    subw r2, r4
+    subw r3, r5
+
+    leaw r4, flag
+    leaw r5, code
+
+    addw r4, r2
+    addw r5, r3
+
+    movb r6, [r4] # cipher byte
+    movb r7, [r5] # key byte
+
+    xorb r6, r7
+    rolb r6, r7
+
+    movb [r4], r6
+
+    subw r1, 1
+    jmpb decrypt_loop, 1
+######## DECRYPT FLAG ########
+
+
+start: #################################################### ENTRY POINT
+##### USER INPUT #####
+    # print banner
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_banner
+    jmpb print, 1
+    
+    # print 
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_name
+    jmpb print, 1
+
+    # input name
+    movw r0, rip
+    addw r0, 24
+    leaw r1, inp_name
+    movw r2, 32
+    jmpb get_line, 1
+
+    movw inp_name_len, r2
+
+    # upper name
+    movw r0, rip
+    addw r0, 19
+    leaw r1, inp_name
+    jmpb upper, 1
+    
+    # print 
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_code
+    jmpb print, 1
+
+    # input code
+    movw r0, rip
+    addw r0, 24
+    leaw r1, inp_code
+    movw r2, 65
+    jmpb get_line, 1
+
+    movw inp_code_len, r2
+
+    # upper code
+    movw r0, rip
+    addw r0, 19
+    leaw r1, inp_code
+    jmpb upper, 1
+    
+##### USER INPUT #####
+##### VALIDATE INPUT #####
+    movw r1, inp_code_len
+    subw r1, 64
+
+    # validate code
+    jmpw invalid_creditionals, r1
+    
+    # code h2b 
+    movw r0, rip
+    addw r0, 24
+    leaw r1, inp_code
+    leaw r6, code
+    jmpb hex2bytes, 1
+
+    # validate code from hex
+
+    jmpb invalid_creditionals, r2
+
+    # init vars
+    movw r0, rip
+    addw r0, 19
+    leaw r1, inp_name
+    jmpb initvars, 1
+
+    jmpb invalid_creditionals, r2
+
+    # init vars
+    movw r0, rip
+    addw r0, 14
+    jmpb check_code, 1
+
+    jmpb invalid_creditionals, r2
+
+##### VALIDATE INPUT #####
+#### MENU ####
+
+    # print
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_welcome
+    jmpb print, 1
+
+    # print
+    movw r0, rip
+    addw r0, 19
+    leaw r1, inp_name
+    jmpb print, 1
+
+    # print
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_excl
+    jmpb print, 1
+
+    # print
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_options
+    jmpb print, 1
+
+menu_loop:
+    # print
+    movw r0, rip
+    addw r0, 14
+    jmpb menu_proc, 1
+    
+    jmpb menu_loop, 1
+
+#### MENU ####
+
+invalid_creditionals:
+    # print
+    movw r0, rip
+    addw r0, 19
+    leaw r1, str_invalid_cd
+    jmpb print, 1
+    exitd
